@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRXAI Web Messenger</title>
+    <link rel="icon" href="https://cdn.phototourl.com/member/2026-11-15-88e67d02-345c-46b1-ae13-9d89bc410329.png">
+    <!-- Socket.io Client -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #E5E5E5;
+            --bg-card: #FFFFFF;
+            --bg-dark: #141414;
+            --bg-gray: #D4D4D4;
+            --border-color: #000000;
+            --text-main: #000000;
+            --text-muted: #525252;
+            --shadow: 5px 5px 0px #000000;
+            --shadow-sm: 3px 3px 0px #000000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Topbar */
+        .navbar {
+            background: var(--bg-card);
+            border-bottom: 3px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand img {
+            width: 38px;
+            height: 38px;
+            border: 2px solid var(--border-color);
+            background: #fff;
+            object-fit: cover;
+        }
+
+        .brand h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-gray);
+            font-weight: 700;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .status-badge.online {
+            background: #141414;
+            color: #FFFFFF;
+        }
+
+        /* Halaman Login / Pairing */
+        .auth-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .neo-box {
+            background: var(--bg-card);
+            border: 3px solid var(--border-color);
+            box-shadow: var(--shadow);
+            padding: 32px;
+            width: 100%;
+            max-width: 460px;
+        }
+
+        .neo-box h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .neo-box p {
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .neo-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            background: #F9F9F9;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            outline: none;
+            transition: 0.15s;
+        }
+
+        .neo-input:focus {
+            background: #FFFFFF;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .neo-btn {
+            width: 100%;
+            padding: 13px;
+            background: var(--bg-dark);
+            color: #FFFFFF;
+            border: 2px solid var(--border-color);
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .neo-btn:active {
+            transform: translate(3px, 3px);
+            box-shadow: 0px 0px 0px #000;
+        }
+
+        .neo-btn.secondary {
+            background: #FFFFFF;
+            color: #000000;
+            margin-top: 10px;
+        }
+
+        .pairing-result {
+            margin-top: 22px;
+            padding: 18px;
+            border: 3px dashed var(--border-color);
+            background: #F4F4F4;
+            text-align: center;
+            display: none;
+        }
+
+        .pairing-code-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            margin: 10px 0;
+            background: #FFFFFF;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+        }
+
+        /* Halaman Utama Messenger */
+        .messenger-container {
+            display: none;
+            flex: 1;
+            height: calc(100vh - 108px);
+            max-width: 1350px;
+            width: 96%;
+            margin: 16px auto;
+            border: 3px solid var(--border-color);
+            box-shadow: var(--shadow);
+            background: var(--bg-card);
+            overflow: hidden;
+        }
+
+        /* Sidebar Kontak */
+        .sidebar {
+            width: 340px;
+            border-right: 3px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            background: #F4F4F4;
+        }
+
+        .sidebar-header {
+            padding: 14px;
+            border-bottom: 2px solid var(--border-color);
+            background: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sidebar-top-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-mini {
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            border: 2px solid #000;
+            background: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-mini.danger {
+            background: #141414;
+            color: #fff;
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .chat-item {
+            padding: 14px 16px;
+            border-bottom: 2px solid var(--border-color);
+            background: #FFFFFF;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .chat-item:hover {
+            background: #E5E5E5;
+        }
+
+        .chat-item.active {
+            background: #141414;
+            color: #FFFFFF;
+        }
+
+        .chat-item-name {
+            font-weight: 700;
+            font-size: 0.98rem;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-item-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        /* Area Chat */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #EAEAEA;
+        }
+
+        .chat-header {
+            padding: 14px 20px;
+            background: #FFFFFF;
+            border-bottom: 3px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .messages-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .msg-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            font-size: 0.95rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .msg-in {
+            align-self: flex-start;
+            background: #FFFFFF;
+            color: #000000;
+        }
+
+        .msg-out {
+            align-self: flex-end;
+            background: #141414;
+            color: #FFFFFF;
+        }
+
+        .msg-time {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            margin-top: 6px;
+            opacity: 0.7;
+            text-align: right;
+        }
+
+        .chat-input-bar {
+            padding: 14px;
+            background: #FFFFFF;
+            border-top: 3px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input-bar input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .chat-input-bar button {
+            padding: 0 24px;
+            background: #141414;
+            color: #FFFFFF;
+            border: 2px solid var(--border-color);
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Footer Developer */
+        .footer {
+            background: #141414;
+            color: #FFFFFF;
+            text-align: center;
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            border-top: 3px solid #000;
+        }
+
+        /* Responsif Mobile */
+        @media (max-width: 768px) {
+            .messenger-container {
+                flex-direction: column;
+                height: calc(100vh - 105px);
+            }
+            .sidebar {
+                width: 100%;
+                height: 38%;
+                border-right: none;
+                border-bottom: 3px solid #000;
+            }
+            .chat-area {
+                height: 62%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="brand">
+            <img src="https://cdn.phototourl.com/member/2026-11-15-88e67d02-345c-46b1-ae13-9d89bc410329.png" alt="FRXAI Logo">
+            <h1>FRXAI Web Messenger</h1>
+        </div>
+        <div id="serverStatus" class="status-badge">SERVER: OFFLINE</div>
+    </header>
+
+    <!-- Halaman Awal: Pairing Code -->
+    <main id="authSection" class="auth-container">
+        <div class="neo-box">
+            <h2>Tautkan Perangkat WhatsApp</h2>
+            <p>Hubungkan akun WhatsApp kamu menggunakan <b>Kode Pairing</b>. Masukkan URL Server Termux dan nomor WhatsApp aktif.</p>
+
+            <div class="input-group">
+                <label>URL Server Termux (Ngrok / Cloudflare)</label>
+                <input type="text" id="serverUrlInput" class="neo-input" placeholder="https://xxxx.ngrok-free.app">
+            </div>
+
+            <div class="input-group">
+                <label>Nomor WhatsApp (Awali kode negara, tanpa +)</label>
+                <input type="number" id="phoneInput" class="neo-input" placeholder="6281234567890">
+            </div>
+
+            <button class="neo-btn" onclick="requestPairingCode()">DAPATKAN KODE PAIRING</button>
+
+            <div id="pairingBox" class="pairing-result">
+                <span style="font-size: 0.85rem; font-weight: 700;">MASUKKAN KODE INI DI WHATSAPP HP KAMU:</span>
+                <div id="pairingCodeDisplay" class="pairing-code-text">---- ----</div>
+                <small style="color: #444;">Buka WhatsApp &gt; Titik Tiga / Pengaturan &gt; Perangkat Tertaut &gt; Tautkan Perangkat &gt; Tautkan dengan nomor telepon saja.</small>
+            </div>
+        </div>
+    </main>
+
+    <!-- Halaman Depan Messenger (Setelah Terhubung) -->
+    <section id="messengerSection" class="messenger-container">
+        <!-- Sidebar Daftar Chat -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-top-actions">
+                    <span id="loggedUser" style="font-weight: 700; font-size: 0.85rem;">Akun Terhubung</span>
+                    <button class="btn-mini danger" onclick="logoutDevice()">Putuskan</button>
+                </div>
+                <input type="text" id="searchChat" class="neo-input" style="padding: 8px; font-size: 0.85rem;" placeholder="Cari kontak atau nomor..." onkeyup="filterChats()">
+                <button class="btn-mini" onclick="startNewChat()">+ Chat Nomor Baru</button>
+            </div>
+            <div id="chatList" class="chat-list">
+                <!-- Daftar chat dimuat otomatis di sini -->
+            </div>
+        </aside>
+
+        <!-- Area Percakapan -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <div>
+                    <strong id="activeChatName">Pilih Obrolan</strong>
+                    <div id="activeChatJid" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #555;">-</div>
+                </div>
+            </div>
+
+            <div id="messagesBox" class="messages-box">
+                <div style="margin: auto; text-align: center; color: #555;">
+                    <b>FRXAI Web Messenger</b><br>
+                    Pilih kontak di sebelah kiri untuk mulai berkirim pesan.
+                </div>
+            </div>
+
+            <form class="chat-input-bar" onsubmit="sendMessage(event)">
+                <input type="text" id="messageInput" placeholder="Ketik pesan di sini..." autocomplete="off">
+                <button type="submit">KIRIM</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        FRXAI Web Messenger &copy; 2026 | Developer: Faiz Muttaqien
+    </footer>
+
+    <script>
+        let socket = null;
+        let allChats = [];
+        let currentChatJid = null;
+
+        // Muat URL server terakhir jika tersimpan di browser
+        window.onload = () => {
+            const savedUrl = localStorage.getItem('frxai_server_url');
+            if (savedUrl) {
+                document.getElementById('serverUrlInput').value = savedUrl;
+                connectToSocket(savedUrl);
+            }
+        };
+
+        function connectToSocket(url) {
+            if (socket) socket.disconnect();
+            const cleanUrl = url.replace(/\/$/, '');
+            localStorage.setItem('frxai_server_url', cleanUrl);
+
+            socket = io(cleanUrl, {
+                extraHeaders: { "ngrok-skip-browser-warning": "true" }
+            });
+
+            socket.on('connect', () => {
+                const badge = document.getElementById('serverStatus');
+                badge.innerText = 'SERVER: TERHUBUNG';
+                badge.classList.add('online');
+            });
+
+            socket.on('disconnect', () => {
+                const badge = document.getElementById('serverStatus');
+                badge.innerText = 'SERVER: TERPUTUS';
+                badge.classList.remove('online');
+            });
+
+            socket.on('status', (data) => {
+                if (data.status === 'connected') {
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('messengerSection').style.display = 'flex';
+                    if (data.user) {
+                        document.getElementById('loggedUser').innerText = data.user.name || data.user.id.split(':')[0];
+                    }
+                } else {
+                    document.getElementById('authSection').style.display = 'flex';
+                    document.getElementById('messengerSection').style.display = 'none';
+                }
+            });
+
+            socket.on('pairing_code', (code) => {
+                document.getElementById('pairingBox').style.display = 'block';
+                document.getElementById('pairingCodeDisplay').innerText = code;
+            });
+
+            socket.on('pairing_error', (msg) => {
+                alert(msg);
+            });
+
+            socket.on('chats_list', (chats) => {
+                allChats = chats;
+                renderChatList(allChats);
+            });
+
+            socket.on('chat_history', ({ jid, messages }) => {
+                if (jid !== currentChatJid) return;
+                const box = document.getElementById('messagesBox');
+                box.innerHTML = '';
+                messages.forEach(msg => appendMessage(msg));
+                box.scrollTop = box.scrollHeight;
+            });
+
+            socket.on('new_message', (msg) => {
+                if (msg.jid === currentChatJid) {
+                    appendMessage(msg);
+                    const box = document.getElementById('messagesBox');
+                    box.scrollTop = box.scrollHeight;
+                }
+                // Tambahkan ke daftar chat jika belum ada
+                if (!allChats.find(c => c.id === msg.jid)) {
+                    allChats.unshift({
+                        id: msg.jid,
+                        name: msg.pushName || msg.jid.split('@')[0]
+                    });
+                    renderChatList(allChats);
+                }
+            });
+        }
+
+        function requestPairingCode() {
+            const url = document.getElementById('serverUrlInput').value.trim();
+            const phone = document.getElementById('phoneInput').value.trim();
+
+            if (!url || !phone) {
+                alert('Harap isi URL Server Termux dan Nomor WhatsApp!');
+                return;
+            }
+
+            connectToSocket(url);
+            document.getElementById('pairingBox').style.display = 'block';
+            document.getElementById('pairingCodeDisplay').innerText = 'MEMUAT...';
+
+            setTimeout(() => {
+                socket.emit('request_pairing', phone);
+            }, 1000);
+        }
+
+        function renderChatList(chats) {
+            const list = document.getElementById('chatList');
+            list.innerHTML = '';
+            chats.forEach(chat => {
+                const div = document.createElement('div');
+                div.className = `chat-item ${chat.id === currentChatJid ? 'active' : ''}`;
+                div.onclick = () => selectChat(chat.id, chat.name);
+                div.innerHTML = `
+                    <div class="chat-item-name">${chat.name}</div>
+                    <div class="chat-item-id">${chat.id.split('@')[0]}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function filterChats() {
+            const query = document.getElementById('searchChat').value.toLowerCase();
+            const filtered = allChats.filter(c =>
+                c.name.toLowerCase().includes(query) || c.id.includes(query)
+            );
+            renderChatList(filtered);
+        }
+
+        function selectChat(jid, name) {
+            currentChatJid = jid;
+            document.getElementById('activeChatName').innerText = name;
+            document.getElementById('activeChatJid').innerText = jid.split('@')[0];
+            document.getElementById('messagesBox').innerHTML = '<div style="margin:auto;">Memuat pesan...</div>';
+            renderChatList(allChats);
+            socket.emit('get_messages', jid);
+        }
+
+        function startNewChat() {
+            const num = prompt('Masukkan nomor WhatsApp tujuan (contoh: 6281234567890):');
+            if (!num) return;
+            const clean = num.replace(/[^0-9]/g, '');
+            if (!clean) return;
+            const jid = `${clean}@s.whatsapp.net`;
+            if (!allChats.find(c => c.id === jid)) {
+                allChats.unshift({ id: jid, name: clean });
+                renderChatList(allChats);
+            }
+            selectChat(jid, clean);
+        }
+
+        function appendMessage(msg) {
+            const box = document.getElementById('messagesBox');
+            const div = document.createElement('div');
+            div.className = `msg-bubble ${msg.fromMe ? 'msg-out' : 'msg-in'}`;
+            const date = msg.timestamp ? new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            div.innerHTML = `
+                <div>${escapeHtml(msg.text)}</div>
+                <span class="msg-time">${date}</span>
+            `;
+            box.appendChild(div);
+        }
+
+        function sendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text || !currentChatJid || !socket) return;
+
+            socket.emit('send_message', {
+                jid: currentChatJid,
+                text: text
+            });
+            input.value = '';
+        }
+
+        function logoutDevice() {
+            if (confirm('Putuskan tautan perangkat WhatsApp ini?')) {
+                socket.emit('logout_wa');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
